@@ -1,0 +1,18 @@
+# how many architectures from 00 to fan out into wing families
+n_arch_from_00: 10
+
+families:
+  wingA:
+    AR: [8.5, 9.5]
+    taper: [0.5, 0.7]
+    dihedral_deg: [5, 10]
+    twist_root_deg: [2, 3]
+    twist_tip_deg: [-1, -2]
+    airfoil: [ag13]
+  wingB:
+    AR: [7.5, 8.5]
+    taper: [0.55, 0.6]
+    dihedral_deg: [5, 10]
+    twist_root_deg: [2, 3]
+    twist_tip_deg: [-1, -2]
+    airfoil: [naca4412, sg6043]

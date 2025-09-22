@@ -1,0 +1,12 @@
+# penalties / weights
+w_Re:   0.5
+w_fin:  0.02
+w_bend: 0.08
+w_elev: 0.002
+w_man:  0.003
+
+regularizers:
+  ts: 0.02
+  ta: 0.01
+  Lb: 0.01
+  tikhonov: 1.0e-5

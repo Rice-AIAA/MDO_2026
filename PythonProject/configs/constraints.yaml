@@ -1,0 +1,21 @@
+# Stability & trim
+tail_vol_min: 0.35
+trim_tol_cm: 0.02
+cg_frac_forward: 0.22
+cg_frac_aft: 0.28
+sm_target: 0.10
+
+# Control limits
+delta_e_cr_max_deg: 15.0
+delta_e_cl_max_deg: 20.0
+washout_min_deg: -1.5          # tip twist must be <= -1.5 deg (i.e., at least 1.5° washout)
+tip_a_climb_cap_deg: 15.0
+
+# Tip Reynolds / CL cap
+re_tip_min: 150000
+cl_tip_max: 1.1
+
+# Fuselage practicality
+bay_volume_min_m3: 0.0015
+fineness_min: 4.0
+fineness_max: 8.0

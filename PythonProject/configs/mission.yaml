@@ -1,0 +1,16 @@
+# Environment / geometry
+rho: 1.225
+mu: 1.81e-5
+S_ref_nom: 0.25
+b_max: 1.50
+clmax_wing: 1.30
+
+# Speeds [m/s]
+V_cruise: 18.0
+V_climb: 14.0
+V_stall_max: 11.0
+
+# Weight fallback (used if not provided per-config)
+W_fallback: 20.0
+
+cd0_pad: 0.003   # generic profile/odds-and-ends drag pad added to CD

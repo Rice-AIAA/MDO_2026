@@ -1,0 +1,16 @@
+arch_id,wing_place,tail_type,wingtip,prop_layout,engines,gear,score,e,CD0,D_proxy,bend,risk,mfg
+arch-low-conv-raked-tractor-1eng-fixed,low,conv,raked,tractor,1,fixed,0.10365761362779957,0.8400000000000001,0.016,0.031157613627799556,3.375,0.0,-0.1
+arch-mid-conv-raked-tractor-1eng-fixed,mid,conv,raked,tractor,1,fixed,0.10384948215473373,0.8295000000000001,0.016,0.031349482154733724,3.375,0.0,-0.1
+arch-high-conv-raked-tractor-1eng-fixed,high,conv,raked,tractor,1,fixed,0.10704627038748674,0.8190000000000001,0.019,0.03454627038748672,3.375,0.0,-0.1
+arch-low-twinboom-raked-tractor-1eng-fixed,low,twinboom,raked,tractor,1,fixed,0.10718261362779957,0.8400000000000001,0.0175,0.03265761362779956,3.4762500000000003,0.0,-0.1
+arch-mid-twinboom-raked-tractor-1eng-fixed,mid,twinboom,raked,tractor,1,fixed,0.10737448215473373,0.8295000000000001,0.0175,0.032849482154733725,3.4762500000000003,0.0,-0.1
+arch-high-twinboom-raked-tractor-1eng-fixed,high,twinboom,raked,tractor,1,fixed,0.11057127038748674,0.8190000000000001,0.0205,0.03604627038748672,3.4762500000000003,0.0,-0.1
+arch-low-T-raked-tractor-1eng-fixed,low,T,raked,tractor,1,fixed,0.15365761362779956,0.8400000000000001,0.016,0.031157613627799556,3.375,0.5,-0.1
+arch-mid-T-raked-tractor-1eng-fixed,mid,T,raked,tractor,1,fixed,0.15384948215473374,0.8295000000000001,0.016,0.031349482154733724,3.375,0.5,-0.1
+arch-high-T-raked-tractor-1eng-fixed,high,T,raked,tractor,1,fixed,0.15704627038748675,0.8190000000000001,0.019,0.03454627038748672,3.375,0.5,-0.1
+arch-low-V-raked-tractor-1eng-fixed,low,V,raked,tractor,1,fixed,0.18365761362779956,0.8400000000000001,0.016,0.031157613627799556,3.375,0.3,-0.1
+arch-mid-V-raked-tractor-1eng-fixed,mid,V,raked,tractor,1,fixed,0.1838494821547337,0.8295000000000001,0.016,0.031349482154733724,3.375,0.3,-0.1
+arch-high-V-raked-tractor-1eng-fixed,high,V,raked,tractor,1,fixed,0.18704627038748672,0.8190000000000001,0.019,0.03454627038748672,3.375,0.3,-0.1
+arch-low-canard-raked-tractor-1eng-fixed,low,canard,raked,tractor,1,fixed,0.6036576136277996,0.8400000000000001,0.016,0.031157613627799556,3.375,0.0,-0.1
+arch-mid-canard-raked-tractor-1eng-fixed,mid,canard,raked,tractor,1,fixed,0.6038494821547338,0.8295000000000001,0.016,0.031349482154733724,3.375,0.0,-0.1
+arch-high-canard-raked-tractor-1eng-fixed,high,canard,raked,tractor,1,fixed,0.6070462703874867,0.8190000000000001,0.019,0.03454627038748672,3.375,0.0,-0.1

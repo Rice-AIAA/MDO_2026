@@ -1,0 +1,3 @@
+alphas_deg: [-6, -4, -2, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18]
+xfoil_path: null      # or "C:/path/to/xfoil.exe"
+library: ["ag13", "naca4412", "sg6043", "naca0010", "naca0008"]

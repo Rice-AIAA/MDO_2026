@@ -1,0 +1,14 @@
+ipopt:
+  max_iter: 4000
+  tol: 1.0e-6
+  acceptable_tol: 5.0e-4
+  acceptable_iter: 10
+  sb: "yes"
+  print_level: 0
+  output_file: ""                 # set by code per-run
+  file_print_level: 5
+  print_frequency_iter: 50
+  hessian_approximation: "limited-memory"
+  limited_memory_max_history: 20
+  mu_strategy: "adaptive"
+  nlp_scaling_method: "gradient-based"

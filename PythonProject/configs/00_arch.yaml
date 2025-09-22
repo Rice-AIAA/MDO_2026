@@ -1,0 +1,25 @@
+# how many to carry forward (before diversity)
+top_k: 10
+diversify: true
+
+# nominal geometry for quick proxies
+span_m_nom: 1.5
+S_ref_nom: 0.25
+CL_cruise_nom: 0.60
+sc_min: 1.0
+
+# weights in the score
+weights:
+  wD: 1.0
+  wSC: 0.5
+  wB: 0.02
+  wR: 0.1
+  wM: -0.05
+
+# enumerations (override to narrow/broaden the search)
+wing_place: [low, mid, high]
+tail_type: [conv, T, V, twinboom, canard]
+wingtip: [none, winglet, raked]
+prop_layout: [tractor, pusher]
+engines: [1, 2]
+gear: [fixed]

@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: aeroopt
+Version: 0.0.1
+Requires-Python: >=3.9
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: pandas>=2.0
+Requires-Dist: numpy>=1.24
+Requires-Dist: aerosandbox>=4.0
