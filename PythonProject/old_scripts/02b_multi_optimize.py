@@ -14,7 +14,7 @@ import re
 # -------------------------
 ROOT = Path(__file__).resolve().parent
 DIR_IN = ROOT / "results"              # Script 1 JSONs
-DIR_OUT = ROOT / "results_02b_multi"
+DIR_OUT = ROOT / "results_02b_multi" #TESTING 1
 DIR_OUT.mkdir(parents=True, exist_ok=True)
 CSV_OUT = DIR_OUT / "multi_opt_summary.csv"
 
