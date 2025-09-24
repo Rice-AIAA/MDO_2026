@@ -1,6 +1,6 @@
 # multiMDO_graphs_0923.py
 # For each configuration, opens ONE composite figure window:
-# [ airplane three-view image (captured in-memory) ] + [ mass pie ] + [ 4 aero graphs ]
+# [ airplane three-view image (captured in-memory) ] + [ mass pie ] + [ advanced aero graphs ]
 # Nothing is saved to disk.
 
 import aerosandbox as asb
@@ -8,6 +8,7 @@ import aerosandbox.numpy as np
 import aerosandbox.tools.units as u
 import copy
 from pathlib import Path
+import pandas as pd
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -18,6 +19,9 @@ from aerosandbox.tools.string_formatting import eng_string
 # # COMMON SETUP
 # ##############################################################################
 print("Performing common setup...")
+
+# --- Global list to store results for final comparison
+results_summary = []
 
 # --- Create directory only for polar cache
 Path("cache").mkdir(exist_ok=True)
@@ -59,7 +63,7 @@ def _three_view_to_array(airplane, dpi: int = 200):
     airplane.draw_three_view(show=False)
     fig = plt.gcf()
 
-    # Draw to an Agg canvas and grab the RGB buffer
+    # Draw to an Agg canvas and grab the RGBA buffer
     canvas = FigureCanvas(fig)
     canvas.draw()
     w, h = canvas.get_width_height()
@@ -77,18 +81,13 @@ def _composite_report_show(
         op_point,
         mass_props: dict,
         mass_props_TOGW,
-        LD_cruise,
-        sink_rate,
+        aero: dict,
         dpi: int = 200,
 ):
     """
-    Builds one composite figure containing:
-      - airplane three-view (captured image in-memory)
-      - mass-budget pie chart
-      - 4 aero graphs (CL-α, CD-α, Cm-α, L/D-α)
-    Then shows it (no saving).
+    Builds one composite figure containing a comprehensive report, then shows it.
     """
-    # --- Generate aerodynamic polars across alpha
+    # --- Generate aerodynamic polars across alpha for plotting
     alpha_range = np.linspace(-15, 15, 180)
     aero_polars = asb.AeroBuildup(
         airplane=airplane,
@@ -99,34 +98,31 @@ def _composite_report_show(
         xyz_ref=mass_props_TOGW.xyz_cg
     ).run()
 
-    # --- Create the composite figure (constrained_layout to avoid tight_layout warning)
-    fig = plt.figure(figsize=(20, 13), dpi=dpi, constrained_layout=True)
-    fig.suptitle(f"{config_name.replace('_', ' ')}: Summary", fontsize=20, y=0.98)
+    # --- Create the composite figure
+    fig = plt.figure(figsize=(24, 18), dpi=dpi, constrained_layout=True)
+    fig.suptitle(f"{config_name.replace('_', ' ')}: Summary Report", fontsize=24, y=0.98)
 
-    # GridSpec layout: 2 rows x 3 cols
-    # Row 0: [ airplane view | airplane view | pie ]
-    # Row 1: [ CL-α | CD-α | (Cm-α over L/D-α stacked) ]
-    gs = fig.add_gridspec(2, 3, height_ratios=[1.05, 1.3], width_ratios=[1.2, 1.2, 1.2])
+    # --- GridSpec layout: 3 rows x 3 cols
+    gs = fig.add_gridspec(3, 3)
 
-    # --- Airplane view (top-left spanning two columns)
+    # === Row 0: Airplane View and Mass Budget ===
     ax_plane_big = fig.add_subplot(gs[0, 0:2])
     try:
         tv_img = _three_view_to_array(airplane, dpi=max(150, dpi))
         ax_plane_big.imshow(tv_img)
-        ax_plane_big.set_title("Airplane (three-view rendering)", fontsize=14)
+        ax_plane_big.set_title("Airplane (Three-View Rendering)", fontsize=16)
         ax_plane_big.axis("off")
     except Exception as e:
         ax_plane_big.text(0.5, 0.5, f"three_view render failed:\n{e}", ha="center", va="center")
         ax_plane_big.axis("off")
 
-    # --- Mass Budget Pie Chart (top-right)
     ax_pie = fig.add_subplot(gs[0, 2])
     name_remaps = {k: k.replace("_", " ").title() for k in mass_props.keys()}
     mass_props_to_plot = {k: v for k, v in mass_props.items() if float(v.mass) > 1e-9}
     if "ballast" in mass_props_to_plot and float(mass_props_to_plot["ballast"].mass) < 1e-6:
         del mass_props_to_plot["ballast"]
 
-    plt.sca(ax_pie)  # pretty_plots.pie uses current axes
+    plt.sca(ax_pie)
     p.pie(
         values=[v.mass for v in mass_props_to_plot.values()],
         names=[name_remaps.get(n, n) for n in mass_props_to_plot.keys()],
@@ -137,52 +133,84 @@ def _composite_report_show(
         label_format=lambda name, value, percentage: f"{name}, {value * 1e3:.2f} g, {percentage:.1f}%",
         startangle=110, arm_length=28, arm_radius=18, y_max_labels=1.10
     )
-    ax_pie.set_title("Mass Budget", fontsize=14, pad=16)
+    ax_pie.set_title("Mass Budget", fontsize=16, pad=16)
 
-    # --- Aero polars area (bottom row)
+    # === Row 1: Core Aerodynamic Polars ===
     ax_cl = fig.add_subplot(gs[1, 0])
     ax_cd = fig.add_subplot(gs[1, 1])
+    ax_ld = fig.add_subplot(gs[1, 2])
 
-    # Cm and L/D in a small vertical stack inside the last column
-    gs_bottom_right = gs[1, 2].subgridspec(2, 1, hspace=0.35)
-    ax_cm = fig.add_subplot(gs_bottom_right[0, 0])
-    ax_ld = fig.add_subplot(gs_bottom_right[1, 0])
-
-    # CL vs Alpha
     ax_cl.plot(alpha_range, aero_polars["CL"])
-    ax_cl.set_xlabel(r"$\alpha$ [deg]")
-    ax_cl.set_ylabel(r"$C_L$")
-    ax_cl.set_title(r"$C_L$ vs. $\alpha$")
-    ax_cl.grid(True)
+    ax_cl.set_xlabel(r"$\alpha$ [deg]"); ax_cl.set_ylabel(r"$C_L$"); ax_cl.set_title(r"$C_L$ vs. $\alpha$"); ax_cl.grid(True)
 
-    # CD vs Alpha
     ax_cd.plot(alpha_range, aero_polars["CD"])
-    ax_cd.set_xlabel(r"$\alpha$ [deg]")
-    ax_cd.set_ylabel(r"$C_D$")
-    ax_cd.set_title(r"$C_D$ vs. $\alpha$")
-    ax_cd.grid(True)
+    ax_cd.set_xlabel(r"$\alpha$ [deg]"); ax_cd.set_ylabel(r"$C_D$"); ax_cd.set_title(r"$C_D$ vs. $\alpha$"); ax_cd.grid(True)
     ax_cd.set_ylim(bottom=0)
 
-    # Cm vs Alpha
-    ax_cm.plot(alpha_range, aero_polars["Cm"])
-    ax_cm.set_xlabel(r"$\alpha$ [deg]")
-    ax_cm.set_ylabel(r"$C_m$")
-    ax_cm.set_title(r"$C_m$ vs. $\alpha$")
-    ax_cm.grid(True)
-
-    # L/D vs Alpha
     ax_ld.plot(alpha_range, aero_polars["CL"] / aero_polars["CD"])
-    ax_ld.set_xlabel(r"$\alpha$ [deg]")
-    ax_ld.set_ylabel(r"$L/D$")
-    ax_ld.set_title(r"$L/D$ vs. $\alpha$")
-    ax_ld.grid(True)
+    ax_ld.set_xlabel(r"$\alpha$ [deg]"); ax_ld.set_ylabel(r"$L/D$"); ax_ld.set_title(r"$L/D$ vs. $\alpha$"); ax_ld.grid(True)
 
-    # Show (no saving)
+    # === Row 2: Stability and Advanced Aero ===
+    ax_lift_dist = fig.add_subplot(gs[2, 0])
+    ax_sm = fig.add_subplot(gs[2, 1])
+    gs_bottom_right = gs[2, 2].subgridspec(2, 1, hspace=0.1)
+    ax_cm = fig.add_subplot(gs_bottom_right[0, 0])
+    ax_coupling = fig.add_subplot(gs_bottom_right[1, 0])
+
+    # --- FIX: Create a new, clean op_point with definite float values for the VLM.
+    vlm_op_point = asb.OperatingPoint(
+        velocity=float(op_point.velocity),
+        alpha=float(op_point.alpha),
+    )
+    # Spanwise Lift Distribution
+    try:
+        vlm_aero = asb.VortexLatticeMethod(airplane=airplane, op_point=vlm_op_point).run()
+        span_data = vlm_aero["spanwise_data_wing_1"]
+        ax_lift_dist.plot(span_data["y"], span_data["Cl"], "-", label="Actual Lift", color="k")
+        ax_lift_dist.plot(vlm_aero['yl_elliptical_dist'], vlm_aero['Cl_elliptical_dist'], "--",
+                          label="Elliptical Ideal", color="C2")
+        ax_lift_dist.set_xlabel("Spanwise location $y$ [m]"); ax_lift_dist.set_ylabel("Sectional Lift Coeff. $C_l$")
+        ax_lift_dist.set_title("Spanwise Lift Distribution"); ax_lift_dist.grid(True); ax_lift_dist.legend()
+    except Exception as e:
+        ax_lift_dist.text(0.5, 0.5, f"VLM for lift dist failed:\n{e}", ha="center", va="center")
+
+    # Static Margin vs. CG
+    x_np = aero['x_np']
+    mac = airplane.wings[0].mean_aerodynamic_chord()
+    static_margin_actual = (x_np - mass_props_TOGW.x_cg) / mac
+    x_cg_range = np.linspace(x_np - 0.5 * mac, x_np + 0.5 * mac, 200)
+    sm_range = (x_np - x_cg_range) / mac
+    ax_sm.plot(x_cg_range, sm_range * 100)
+    ax_sm.axvline(mass_props_TOGW.x_cg, color='r', linestyle='--', label=f"Actual CG\nSM = {static_margin_actual * 100:.1f}%")
+    ax_sm.axhline(0, color='k', linewidth=0.8); ax_sm.set_xlabel("CG Location $x_{cg}$ [m]")
+    ax_sm.set_ylabel("Static Margin [% MAC]"); ax_sm.set_title("Static Margin vs. CG Location"); ax_sm.grid(True); ax_sm.legend()
+
+    # Cm vs. Alpha
+    ax_cm.plot(alpha_range, aero_polars["Cm"])
+    ax_cm.set_xlabel(r"$\alpha$ [deg]"); ax_cm.set_ylabel(r"$C_m$"); ax_cm.set_title(r"$C_m$ vs. $\alpha$"); ax_cm.grid(True)
+
+    # Directional-Roll Coupling
+    clb = aero.get('Clb', np.nan); cnr = aero.get('Cnr', np.nan)
+    clr = aero.get('Clr', np.nan); cnb = aero.get('Cnb', np.nan)
+    if not any(np.isnan([clb, cnr, clr, cnb])) and clr != 0 and cnb != 0:
+        coupling_metric = (clb * cnr) / (clr * cnb)
+        metric_text = f"{coupling_metric:.3f}"
+        stability_text, color = ("Spiral Stability", "green") if coupling_metric > 0 else ("Spiral Divergence", "red")
+    else:
+        metric_text = "N/A"
+        stability_text, color = ("Analysis Indeterminate", "gray")
+
+    ax_coupling.set_title("Directional-Roll Coupling Proxy"); ax_coupling.axis('off')
+    ax_coupling.text(0.5, 0.7, r"$\frac{C_{l_\beta} C_{n_r}}{C_{l_r} C_{n_\beta}}$", ha='center', fontsize=24)
+    ax_coupling.text(0.5, 0.4, f"= {metric_text}", ha='center', fontsize=20)
+    ax_coupling.text(0.5, 0.1, stability_text, ha='center', fontsize=16, color=color,
+                     bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.5'))
+
     plt.show()
 
 
 def report_solution(sol, config_name, airplane, op_point, mass_props, mass_props_TOGW, LD_cruise, sink_rate, aero):
-    """Print outputs and open the ONE composite figure for a solved configuration."""
+    """Print outputs, open the composite figure, and log data for final comparison."""
     s = lambda x: sol.value(x)
 
     # Substitute numerical values into all of the objects
@@ -196,73 +224,59 @@ def report_solution(sol, config_name, airplane, op_point, mass_props, mass_props
     avl_aero = {}
     try:
         avl_airplane = copy.deepcopy(airplane)
-
-        # Simplify wing for AVL if it has multiple sections
-        if avl_airplane.wings:
+        if avl_airplane.wings and len(avl_airplane.wings[0].xsecs) > 2:
             wing_lowres = avl_airplane.wings[0]
-            if len(wing_lowres.xsecs) > 2:
-                xsecs_to_keep = np.arange(len(wing_lowres.xsecs)) % 2 == 0
-                xsecs_to_keep[0] = True
-                xsecs_to_keep[-1] = True
-                wing_lowres.xsecs = np.array(wing_lowres.xsecs)[xsecs_to_keep]
-
-        avl_aero = asb.AVL(
-            airplane=avl_airplane,
-            op_point=op_point,
-            xyz_ref=mass_props_TOGW.xyz_cg
-        ).run()
-    except (FileNotFoundError, AttributeError, ValueError) as e:
+            xsecs_to_keep = np.arange(len(wing_lowres.xsecs)) % 2 == 0
+            xsecs_to_keep[0], xsecs_to_keep[-1] = True, True
+            wing_lowres.xsecs = np.array(wing_lowres.xsecs)[xsecs_to_keep]
+        avl_aero = asb.AVL(airplane=avl_airplane, op_point=op_point, xyz_ref=mass_props_TOGW.xyz_cg).run()
+    except Exception as e:
         print(f"AVL analysis failed for {config_name}: {e}")
-
         class EmptyDict(dict):
             def __getitem__(self, item): return "AVL Run Failed"
-
             def get(self, key, default=None): return "AVL Run Failed"
-
         avl_aero = EmptyDict()
 
-    # --- Formatter for printout
     def fmt(x):
-        try:
-            return f"{s(x):.6g}"
-        except (TypeError, ValueError):
-            return "N/A"
+        try: return f"{s(x):.6g}"
+        except (TypeError, ValueError): return "N/A"
 
     print_title(f"{config_name} Outputs")
-    for k, v in {
+    output_data = {
         "mass_TOGW": f"{fmt(mass_props_TOGW.mass)} kg ({fmt(mass_props_TOGW.mass / u.lbm)} lbm)",
-        "L/D (actual)": fmt(LD_cruise),
-        "Cruise Airspeed": f"{fmt(op_point.velocity)} m/s",
-        "Cruise AoA": f"{fmt(op_point.alpha)} deg",
-        "Cruise CL": fmt(aero.get('CL')),
-        "Sink Rate": fmt(sink_rate),
-        "Cma": fmt(aero.get('Cma')),
-        "Cnb": fmt(aero.get('Cnb')),
-        "Cm": fmt(aero.get('Cm')),
+        "L/D (actual)": fmt(LD_cruise), "Cruise Airspeed": f"{fmt(op_point.velocity)} m/s",
+        "Cruise AoA": f"{fmt(op_point.alpha)} deg", "Cruise CL": fmt(aero.get('CL')), "Sink Rate": fmt(sink_rate),
+        "Cma": fmt(aero.get('Cma')), "Cnb": fmt(aero.get('Cnb')), "Cm": fmt(aero.get('Cm')),
         "Wing Reynolds Number": eng_string(op_point.reynolds(sol(airplane.wings[0].mean_aerodynamic_chord()))),
-        "AVL: Cma": avl_aero.get('Cma'),
-        "AVL: Cnb": avl_aero.get('Cnb'),
-        "AVL: Cm": avl_aero.get('Cm'),
+        "AVL: Cma": avl_aero.get('Cma'), "AVL: Cnb": avl_aero.get('Cnb'), "AVL: Cm": avl_aero.get('Cm'),
         "AVL: Clb Cnr / Clr Cnb": avl_aero.get('Clb Cnr / Clr Cnb'),
-        "CG location": "(" + ", ".join([fmt(xyz) for xyz in mass_props_TOGW.xyz_cg]) + ") m",
+        "CG location": f"({fmt(mass_props_TOGW.xyz_cg[0])}, {fmt(mass_props_TOGW.xyz_cg[1])}, {fmt(mass_props_TOGW.xyz_cg[2])}) m",
         "Wing Span": f"{fmt(wing_span)} m ({fmt(wing_span / u.foot)} ft)",
-    }.items():
+    }
+    for k, v in output_data.items():
         print(f"{k.rjust(25)} = {v}")
 
     print_title(f"{config_name} Mass Properties")
     for k, v in mass_props.items():
         print(f"{k.rjust(25)} = {s(v.mass) * 1e3:.2f} g ({s(v.mass) / u.oz:.2f} oz)")
 
+    # Data collection for final table
+    avl_coupling = avl_aero.get('Clb Cnr / Clr Cnb', np.nan)
+    summary_data = {
+        "Configuration": config_name.replace("_", " "),
+        "TOGW [g]": s(mass_props_TOGW.mass) * 1e3,
+        "L/D": s(LD_cruise), "Sink Rate [m/s]": s(sink_rate), "V_cruise [m/s]": s(op_point.velocity),
+        "AoA [deg]": s(op_point.alpha), "Cma": s(aero.get('Cma')), "Cnb": s(aero.get('Cnb')),
+        "AVL Coupling": avl_coupling if isinstance(avl_coupling, (float, int)) else np.nan,
+        "CG_x [m]": s(mass_props_TOGW.xyz_cg)[0]
+    }
+    results_summary.append(summary_data)
+
     if make_plots:
         _composite_report_show(
-            config_name=config_name,
-            airplane=airplane,
-            op_point=op_point,
-            mass_props=mass_props,
-            mass_props_TOGW=mass_props_TOGW,
-            LD_cruise=LD_cruise,
-            sink_rate=sink_rate,
-            dpi=220,
+            config_name=config_name, airplane=airplane, op_point=op_point,
+            mass_props=mass_props, mass_props_TOGW=mass_props_TOGW,
+            aero=aero, dpi=200,
         )
 
 
@@ -316,10 +330,8 @@ def optimize_h_tail():
             asb.WingXSec(xyz_le=[0.03, 0, v_tail_height], chord=v_tail_root_chord * 0.7, airfoil=airfoils["naca0008"])
         ]
     )
-    v_tail_right = v_tail.translate([x_tail + 0.01, h_tail_span / 2, 0]);
-    v_tail_right.name = "Right Vertical Stabilizer"
-    v_tail_left = v_tail.translate([x_tail + 0.01, -h_tail_span / 2, 0]);
-    v_tail_left.name = "Left Vertical Stabilizer"
+    v_tail_right = v_tail.translate([x_tail + 0.01, h_tail_span / 2, 0]); v_tail_right.name = "Right Vertical Stabilizer"
+    v_tail_left = v_tail.translate([x_tail + 0.01, -h_tail_span / 2, 0]); v_tail_left.name = "Left Vertical Stabilizer"
 
     x_pod_end = x_nose + 8 * u.inch
     fuselage = asb.Fuselage(
@@ -332,8 +344,7 @@ def optimize_h_tail():
         ]
     )
 
-    airplane = asb.Airplane(name="Feather H-Tail", wings=[wing, h_tail, v_tail_right, v_tail_left],
-                            fuselages=[fuselage])
+    airplane = asb.Airplane(name="Feather H-Tail", wings=[wing, h_tail, v_tail_right, v_tail_left], fuselages=[fuselage])
 
     # --- Mass
     mass_props = {}
@@ -842,8 +853,7 @@ def optimize_flying_wing():
     wing_root_chord = opti.variable(init_guess=0.25, lower_bound=1e-3)
     wing_tip_twist_deg = opti.variable(init_guess=-3, lower_bound=-10, upper_bound=0)  # Washout
 
-    # Define the flying wing geometry parameters
-    wing_dihedral_angle_deg = 10  # Local override for flying wing look
+    wing_dihedral_angle_deg_local = 10  # Reduced dihedral for a more classic flying wing look
     wing_sweep_deg = 30
     wing_taper_ratio = 0.5
     wing_center_span_fraction = 0.20
@@ -857,100 +867,47 @@ def optimize_flying_wing():
     xyz_le_tip = np.array([
         xyz_le_break[0] + span_outer_panel * np.tand(wing_sweep_deg),
         span_tip,
-        xyz_le_break[2] + span_outer_panel * np.tand(wing_dihedral_angle_deg)
+        xyz_le_break[2] + span_outer_panel * np.tand(wing_dihedral_angle_deg_local)
     ])
 
     wing = asb.Wing(
-        name="Main Wing",
-        symmetric=True,
+        name="Main Wing", symmetric=True,
         xsecs=[
-            asb.WingXSec(  # Root
-                xyz_le=[-0.25 * wing_root_chord, 0, 0],
-                chord=wing_root_chord,
-                twist=0,
-                airfoil=airfoils["ag13"],
-            ),
-            asb.WingXSec(  # Break
-                xyz_le=xyz_le_break,
-                chord=wing_root_chord,
-                twist=0,
-                airfoil=airfoils["ag13"],
-            ),
-            asb.WingXSec(  # Tip
-                xyz_le=xyz_le_tip,
-                chord=chord_tip,
-                twist=wing_tip_twist_deg,
-                airfoil=airfoils["ag13"],
-            )
+            asb.WingXSec(xyz_le=[-0.25 * wing_root_chord, 0, 0], chord=wing_root_chord, twist=0, airfoil=airfoils["ag13"]),
+            asb.WingXSec(xyz_le=xyz_le_break, chord=wing_root_chord, twist=0, airfoil=airfoils["ag13"]),
+            asb.WingXSec(xyz_le=xyz_le_tip, chord=chord_tip, twist=wing_tip_twist_deg, airfoil=airfoils["ag13"])
         ]
     )
 
-    # Add winglets for directional stability
-    winglet_height = 0.08
-    winglet_chord = 0.07
-    winglet_sweep = 15
-    winglet_cant = 10  # Degrees outward from vertical
-
+    winglet_height = 0.08; winglet_chord = 0.07; winglet_sweep = 15; winglet_cant = 10
     winglets = asb.Wing(
-        name="Winglets",
-        symmetric=True,
+        name="Winglets", symmetric=True,
         xsecs=[
-            asb.WingXSec(  # Base of winglet
-                xyz_le=xyz_le_tip + np.array([chord_tip * 0.75, 0, 0]),
-                chord=winglet_chord,
-                airfoil=airfoils["naca0008"]
-            ),
-            asb.WingXSec(  # Tip of winglet
-                xyz_le=xyz_le_tip + np.array([
-                    chord_tip * 0.75 + winglet_height * np.tand(winglet_sweep),
-                    winglet_height * np.sind(winglet_cant),
-                    winglet_height * np.cosd(winglet_cant)
-                ]),
-                chord=winglet_chord * 0.7,
-                airfoil=airfoils["naca0008"]
-            )
+            asb.WingXSec(xyz_le=xyz_le_tip + np.array([chord_tip * 0.75, 0, 0]), chord=winglet_chord, airfoil=airfoils["naca0008"]),
+            asb.WingXSec(xyz_le=xyz_le_tip + np.array([
+                chord_tip * 0.75 + winglet_height * np.tand(winglet_sweep),
+                winglet_height * np.sind(winglet_cant),
+                winglet_height * np.cosd(winglet_cant)
+            ]), chord=winglet_chord * 0.7, airfoil=airfoils["naca0008"])
         ]
     )
-
     airplane = asb.Airplane(name="Feather Flying Wing", wings=[wing, winglets], fuselages=[])
 
     # --- Mass
     mass_props = {}
     density = 2 * u.lbm / u.foot ** 3
     mass_props['wing'] = asb.mass_properties_from_radius_of_gyration(
-        mass=wing.volume() * density,
-        x_cg=wing.aerodynamic_center()[0],
-        z_cg=wing.aerodynamic_center()[2],
-    )
+        mass=wing.volume() * density, x_cg=wing.aerodynamic_center()[0], z_cg=wing.aerodynamic_center()[2])
     mass_props["winglets"] = asb.mass_properties_from_radius_of_gyration(
-        mass=winglets.volume() * 80,
-        x_cg=winglets.aerodynamic_center()[0],
-        z_cg=winglets.aerodynamic_center()[2]
-    )
-
-    # Pusher-prop configuration masses
+        mass=winglets.volume() * 80, x_cg=winglets.aerodynamic_center()[0], z_cg=winglets.aerodynamic_center()[2])
     x_pusher_prop_mount = 0.6 * wing_root_chord
-    mass_props["motor"] = asb.mass_properties_from_radius_of_gyration(
-        mass=4.49e-3, x_cg=x_pusher_prop_mount - 0.3 * u.inch
-    )
-    mass_props["motor_bolts"] = asb.mass_properties_from_radius_of_gyration(
-        mass=4 * 0.075e-3, x_cg=x_pusher_prop_mount
-    )
-    mass_props["propeller"] = asb.mass_properties_from_radius_of_gyration(
-        mass=1.54e-3, x_cg=x_pusher_prop_mount + 0.4 * u.inch
-    )
-    mass_props["propeller_band"] = asb.mass_properties_from_radius_of_gyration(
-        mass=0.06e-3, x_cg=mass_props["propeller"].x_cg
-    )
-
-    # Electronics bay at the front of the center section
+    mass_props["motor"] = asb.mass_properties_from_radius_of_gyration(mass=4.49e-3, x_cg=x_pusher_prop_mount - 0.3 * u.inch)
+    mass_props["motor_bolts"] = asb.mass_properties_from_radius_of_gyration(mass=4 * 0.075e-3, x_cg=x_pusher_prop_mount)
+    mass_props["propeller"] = asb.mass_properties_from_radius_of_gyration(mass=1.54e-3, x_cg=x_pusher_prop_mount + 0.4 * u.inch)
+    mass_props["propeller_band"] = asb.mass_properties_from_radius_of_gyration(mass=0.06e-3, x_cg=mass_props["propeller"].x_cg)
     x_avionics_bay = -0.1 * wing_root_chord
-    mass_props["flight_computer"] = asb.mass_properties_from_radius_of_gyration(
-        mass=4.30e-3, x_cg=x_avionics_bay
-    )
-    mass_props["battery"] = asb.mass_properties_from_radius_of_gyration(
-        mass=4.61e-3, x_cg=x_avionics_bay - 1.5 * u.inch
-    )
+    mass_props["flight_computer"] = asb.mass_properties_from_radius_of_gyration(mass=4.30e-3, x_cg=x_avionics_bay)
+    mass_props["battery"] = asb.mass_properties_from_radius_of_gyration(mass=4.61e-3, x_cg=x_avionics_bay - 1.5 * u.inch)
     mass_props["ballast"] = asb.MassProperties(
         mass=opti.variable(init_guess=0, lower_bound=0),
         x_cg=opti.variable(init_guess=0, lower_bound=-0.25 * wing_root_chord, upper_bound=0.75 * wing_root_chord)
@@ -972,7 +929,7 @@ def optimize_flying_wing():
     opti.subject_to([
         aero["L"] >= 9.81 * mass_props_TOGW.mass,
         aero["Cm"] == 0,
-        static_margin == 0.05,  # Relaxed static margin for flying wing
+        static_margin == 0.05,
         LD_cruise == LD,
         design_mass_TOGW == mass_props_TOGW.mass,
     ])
@@ -989,3 +946,19 @@ if __name__ == "__main__":
     optimize_v_tail()
     optimize_reverse_v_tail_twin_boom()
     optimize_flying_wing()
+
+    # --- Create and print the final comparison table
+    print("\n\n" + "=" * 80)
+    print("      OVERALL COMPARISON OF OPTIMIZED CONFIGURATIONS")
+    print("=" * 80)
+
+    if results_summary:
+        df = pd.DataFrame(results_summary)
+        df.set_index("Configuration", inplace=True)
+        # Format columns for better readability
+        for col in df.columns:
+            if df[col].dtype == 'float64':
+                df[col] = df[col].map('{:.3f}'.format)
+        print(df.to_string())
+    else:
+        print("No results were generated to compare.")
